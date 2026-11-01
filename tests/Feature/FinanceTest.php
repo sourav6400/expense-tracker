@@ -9,6 +9,44 @@ class FinanceTest extends TestCase {
     protected function setUp(): void { parent::setUp(); $this->withoutVite(); $this->travelTo(\Illuminate\Support\Carbon::parse('2026-10-28 12:00:00', 'Asia/Dhaka')); }
     private function account(int $user, string $name = 'Bank'): int { return DB::table('accounts')->insertGetId(['user_id'=>$user,'name'=>$name,'type'=>'Bank','opening_balance'=>100000]); }
     public function test_guests_must_sign_in(): void { $this->get('/')->assertRedirect('/login'); $this->get('/login')->assertOk(); }
+    public function test_export_applies_date_range_and_transaction_filters(): void {
+        $user=User::factory()->create();$other=User::factory()->create();
+        $a=$this->account($user->id);$b=$this->account($user->id,'Wallet');$foreign=$this->account($other->id);
+        $category=DB::table('categories')->insertGetId(['user_id'=>$user->id,'name'=>'Food']);
+        foreach ([['First day','2026-09-30',$a],['Last day','2026-10-02',$a],['Outside range','2026-10-03',$a],['Other account','2026-10-01',$b]] as [$title,$date,$account]) {
+            DB::table('transactions')->insert(['user_id'=>$user->id,'account_id'=>$account,'category_id'=>$category,'title'=>$title,'date'=>$date,'type'=>'expense','amount'=>100]);
+        }
+        $this->actingAs($user);
+        $url='/export?'.http_build_query(['from'=>'2026-09-30','to'=>'2026-10-02','account_id'=>$a,'category_id'=>$category,'type'=>'expense']);
+        $csv=$this->get($url)->assertOk()->streamedContent();
+        $this->assertStringContainsString('First day',$csv);$this->assertStringContainsString('Last day',$csv);
+        $this->assertStringNotContainsString('Outside range',$csv);$this->assertStringNotContainsString('Other account',$csv);
+        $csv=$this->get($url.'&search=Last')->streamedContent();
+        $this->assertStringContainsString('Last day',$csv);$this->assertStringNotContainsString('First day',$csv);
+        $this->get('/export?from=2026-10-02&to=2026-09-30')->assertSessionHasErrors('to');
+        $this->get('/export?account_id='.$foreign)->assertSessionHasErrors('account_id');
+    }
+    public function test_category_deletion_requires_ownership_and_no_linked_records(): void {
+        $user=User::factory()->create();$other=User::factory()->create();
+        $category=DB::table('categories')->insertGetId(['user_id'=>$user->id,'name'=>'Food']);
+        $foreign=DB::table('categories')->insertGetId(['user_id'=>$other->id,'name'=>'Other food']);
+        $this->delete('/categories/'.$category)->assertRedirect('/login');
+        $this->actingAs($user)->delete('/categories/'.$foreign)->assertNotFound();
+        $account=$this->account($user->id);
+        $transaction=DB::table('transactions')->insertGetId(['user_id'=>$user->id,'account_id'=>$account,'category_id'=>$category,'title'=>'Food','type'=>'expense','amount'=>100,'date'=>'2026-01-01']);
+        $this->delete('/categories/'.$category)->assertSessionHasErrors('category');
+        $this->assertDatabaseHas('transactions',['id'=>$transaction,'category_id'=>$category]);
+        $this->assertDatabaseHas('categories',['id'=>$category]);
+        DB::table('transactions')->where('id',$transaction)->delete();
+        $budget=DB::table('budgets')->insertGetId(['user_id'=>$user->id,'category_id'=>$category,'amount'=>10000,'month'=>'2026-01']);
+        $this->delete('/categories/'.$category)->assertSessionHasErrors('category');
+        $this->assertDatabaseHas('budgets',['id'=>$budget,'category_id'=>$category]);
+        DB::table('budgets')->where('id',$budget)->delete();
+        $this->delete('/categories/'.$category)->assertSessionHasNoErrors()->assertSessionHas('success','Category deleted.');
+        $this->assertDatabaseMissing('categories',['id'=>$category]);
+        $this->assertDatabaseHas('categories',['id'=>$foreign]);
+        $this->delete('/categories/'.$category)->assertNotFound();
+    }
     public function test_account_updates_cannot_change_opening_balance(): void {
         $user=User::factory()->create();$id=$this->account($user->id);
         $this->actingAs($user)->put('/finance/accounts/'.$id,['name'=>'Renamed bank','type'=>'Savings','opening_balance'=>999999,'current_balance'=>999999])->assertSessionHasNoErrors();

@@ -26,3 +26,10 @@ test('type filter combines with account and category and includes incoming trans
  assert.deepEqual(reportTransactions(transactions,'2026-11','1',['10'],'income'),[]);
  assert.deepEqual(reportTransactions(transactions,'2026-11','all',[],'expense').map(t=>t.id),[1]);
 });
+test('date ranges include both endpoints and span months with all filters',()=>{
+ assert.deepEqual(reportTransactions(transactions,{from:'2026-10-01',to:'2026-11-01'}).map(t=>t.id),[1,4]);
+ assert.deepEqual(reportTransactions(transactions,{from:'2026-11-02',to:'2026-11-02'}).map(t=>t.id),[2]);
+ assert.deepEqual(reportTransactions(transactions,{from:'2026-10-01',to:'2026-11-04'},'1',['20'],'income').map(t=>t.id),[5]);
+ assert.deepEqual(reportTransactions(transactions,{from:'2026-11-05',to:'2026-11-01'}),[]);
+ assert.deepEqual(reportTransactions(transactions,{from:'',to:'2026-11-01'}),[]);
+});

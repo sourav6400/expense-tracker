@@ -84,11 +84,40 @@ class FinanceController extends Controller
             return back()->with('success','Account deleted.');
         });
     }
+    public function destroyCategory(Request $r, int $id) {
+        return DB::transaction(function () use ($r, $id) {
+            $category=DB::table('categories')->where(['id'=>$id,'user_id'=>$r->user()->id])->lockForUpdate()->first();
+            abort_unless($category,404);
+            $hasTransactions=DB::table('transactions')->where('category_id',$id)->exists();
+            $hasBudgets=DB::table('budgets')->where('category_id',$id)->exists();
+            if ($hasTransactions||$hasBudgets) return back()->withErrors(['category'=>'This category is linked to transactions or budgets. Remove those records or reassign them to another category before deleting it.']);
+            DB::table('categories')->where('id',$id)->delete();
+            return back()->with('success','Category deleted.');
+        });
+    }
     public function export(Request $r) {
-        return response()->streamDownload(function () use ($r) {
+        $owned=fn($table)=>Rule::exists($table,'id')->where('user_id',$r->user()->id);
+        $filters=$r->validate([
+            'from'=>'nullable|required_with:to|date_format:Y-m-d',
+            'to'=>'nullable|required_with:from|date_format:Y-m-d|after_or_equal:from',
+            'account_id'=>['nullable',$owned('accounts')],
+            'category_id'=>['nullable',$owned('categories')],
+            'type'=>'nullable|in:income,expense,transfer',
+            'search'=>'nullable|string|max:2000',
+        ]);
+        return response()->streamDownload(function () use ($r,$filters) {
             $out=fopen('php://output','w');
             fputcsv($out,['Date','Title','Type','Amount (BDT)','Account','Category','Notes']);
-            $rows=DB::table('transactions as t')->join('accounts as a','a.id','=','t.account_id')->leftJoin('categories as c','c.id','=','t.category_id')->where('t.user_id',$r->user()->id)->select('t.*','a.name as account','c.name as category')->orderBy('date')->get();
+            $query=DB::table('transactions as t')->join('accounts as a','a.id','=','t.account_id')->leftJoin('categories as c','c.id','=','t.category_id')->where('t.user_id',$r->user()->id);
+            if (!empty($filters['from'])) $query->whereBetween('t.date',[$filters['from'],$filters['to']]);
+            if (!empty($filters['account_id'])) $query->where(fn($q)=>$q->where('t.account_id',$filters['account_id'])->orWhere('t.destination_id',$filters['account_id']));
+            if (!empty($filters['category_id'])) $query->where('t.category_id',$filters['category_id']);
+            if (!empty($filters['type'])) $query->where('t.type',$filters['type']);
+            if (!empty($filters['search'])) {
+                $term='%'.str_replace(['!','%','_'],['!!','!%','!_'],strtolower($filters['search'])).'%';
+                $query->where(function($q)use($term){foreach(['t.title','t.notes','c.name'] as $column)$q->orWhereRaw("LOWER(COALESCE($column, '')) LIKE ? ESCAPE '!'",[$term]);});
+            }
+            $rows=$query->select('t.*','a.name as account','c.name as category')->orderBy('date')->get();
             foreach ($rows as $t) {
                 $safe=fn ($s) => preg_match('/^[=+@\-\t\r]/', (string)$s) ? "'".$s : $s;
                 fputcsv($out,array_map($safe,[$t->date,$t->title,$t->type,number_format($t->amount/100,2,'.',''),$t->account,$t->category,$t->notes]));

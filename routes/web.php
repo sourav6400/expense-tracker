@@ -26,6 +26,7 @@ Route::middleware('auth')->group(function () {
     Route::put('/finance/{resource}/{id}', [FinanceController::class,'save']);
     Route::delete('/transactions/{id}', [FinanceController::class,'destroy']);
     Route::delete('/accounts/{id}', [FinanceController::class,'destroyAccount']);
+    Route::delete('/categories/{id}', [FinanceController::class,'destroyCategory']);
     Route::get('/export', [FinanceController::class,'export']);
     Route::post('/logout', function (Request $r) { Auth::logout(); $r->session()->invalidate(); $r->session()->regenerateToken(); return redirect('/login'); });
 });
