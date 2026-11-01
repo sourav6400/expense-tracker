@@ -340,3 +340,5 @@ body select:not([multiple]):not([size]){
 .transaction-filters .select-trigger{height:44px}
 .report-account .custom-select{font-weight:400}
 @media(max-width:1024px),(pointer:coarse){.select-trigger{font-size:16px}.select-option{min-height:44px;font-size:15px}}
+
+.modal input.read-only-balance{background:#f1f5f1;color:#52695b;border-color:#e0e8e0;font-weight:600;cursor:default}

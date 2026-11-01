@@ -51,7 +51,7 @@ class FinanceController extends Controller
         $owned = fn ($table) => Rule::exists($table,'id')->where('user_id',$uid);
         $rules = match ($resource) {
             'transactions'=>['title'=>'required|string|max:150','type'=>'required|in:income,expense,transfer','amount'=>'required|numeric|min:0.01|max:999999999','date'=>['required','date_format:Y-m-d','before_or_equal:'.now('Asia/Dhaka')->toDateString()],'account_id'=>['required',$owned('accounts')],'destination_id'=>['nullable','required_if:type,transfer','different:account_id',$owned('accounts')],'category_id'=>['nullable','required_unless:type,transfer',$owned('categories')],'notes'=>'nullable|string|max:2000'],
-            'accounts'=>['name'=>'required|string|max:100','type'=>'required|string|max:100','opening_balance'=>'required|numeric|min:0|max:999999999'],
+            'accounts'=>['name'=>'required|string|max:100','type'=>'required|string|max:100','opening_balance'=>$id?'exclude':'required|numeric|min:0|max:999999999'],
             'categories'=>['name'=>'required|string|max:100','color'=>'required|regex:/^#[a-fA-F0-9]{6}$/'],
             'budgets'=>['category_id'=>['required',$owned('categories')],'amount'=>'required|numeric|min:0.01|max:999999999','month'=>'required|date_format:Y-m'],
         };

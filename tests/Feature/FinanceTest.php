@@ -9,6 +9,15 @@ class FinanceTest extends TestCase {
     protected function setUp(): void { parent::setUp(); $this->withoutVite(); $this->travelTo(\Illuminate\Support\Carbon::parse('2026-10-28 12:00:00', 'Asia/Dhaka')); }
     private function account(int $user, string $name = 'Bank'): int { return DB::table('accounts')->insertGetId(['user_id'=>$user,'name'=>$name,'type'=>'Bank','opening_balance'=>100000]); }
     public function test_guests_must_sign_in(): void { $this->get('/')->assertRedirect('/login'); $this->get('/login')->assertOk(); }
+    public function test_account_updates_cannot_change_opening_balance(): void {
+        $user=User::factory()->create();$id=$this->account($user->id);
+        $this->actingAs($user)->put('/finance/accounts/'.$id,['name'=>'Renamed bank','type'=>'Savings','opening_balance'=>999999,'current_balance'=>999999])->assertSessionHasNoErrors();
+        $this->assertDatabaseHas('accounts',['id'=>$id,'name'=>'Renamed bank','type'=>'Savings','opening_balance'=>100000]);
+        $this->put('/finance/accounts/'.$id,['name'=>'New name','type'=>'Bank'])->assertSessionHasNoErrors();
+        $this->assertDatabaseHas('accounts',['id'=>$id,'name'=>'New name','opening_balance'=>100000]);
+        $this->post('/finance/accounts',['name'=>'New account','type'=>'Bank','opening_balance'=>'12.35'])->assertSessionHasNoErrors();
+        $this->assertDatabaseHas('accounts',['name'=>'New account','opening_balance'=>1235]);
+    }
     public function test_custom_account_types_can_be_created_and_updated(): void {
         $u=User::factory()->create(); $this->actingAs($u);
         $payload=['name'=>'Travel wallet','type'=>'Mobile wallet','opening_balance'=>0];
