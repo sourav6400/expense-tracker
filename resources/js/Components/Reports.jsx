@@ -1,3 +1,4 @@
+import Select from './Select';
 import TransactionFilters from './TransactionFilters';
 import React,{useState} from 'react';
 import {ChartPie,Download,Tags,Wallet} from 'lucide-react';
@@ -27,7 +28,7 @@ export default function Reports({accounts,categories,transactions,month}){
  };
  return <div className="reports-view">
   <section className="panel report-filters"><div className="panel-heading"><div><h3>Build your report</h3><p>Choose an account and the categories you want to explore.</p></div><ChartPie size={20}/></div>
-   <label className="report-account"><span><Wallet size={16}/> Account</span><select value={activeAccount} onChange={e=>{setAccountId(e.target.value);setSelected([]);}}><option value="all">All accounts</option>{accounts.map(a=><option key={a.id} value={a.id}>{a.name}</option>)}</select></label>
+   <label className="report-account"><span><Wallet size={16}/> Account</span><Select aria-label="Report account" value={activeAccount} onChange={e=>{setAccountId(e.target.value);setSelected([]);}}><option value="all">All accounts</option>{accounts.map(a=><option key={a.id} value={a.id}>{a.name}</option>)}</Select></label>
    <div className="report-category-heading"><span><Tags size={16}/> Related categories</span><button className="text-button" onClick={()=>setSelected([])}>All categories</button></div>
    <div className="report-category-options">{related.map(c=><label key={c.id} className={categoryIds.includes(String(c.id))?'selected':''}><input type="checkbox" checked={categoryIds.includes(String(c.id))} onChange={e=>setSelected(e.target.checked?[...categoryIds,String(c.id)]:categoryIds.filter(id=>id!==String(c.id)))}/>{c.name}</label>)}</div>
    <p className="muted small">{related.length?'Leave categories unchecked to include all categories and transfers. Select categories to focus on income and expenses.':'No categorized transactions for this account yet.'}</p>
