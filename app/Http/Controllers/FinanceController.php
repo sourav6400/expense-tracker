@@ -42,7 +42,7 @@ class FinanceController extends Controller
     }
     public function index(Request $r) {
         $uid = $r->user()->id;
-        return Inertia::render('Dashboard', ['accounts'=>DB::table('accounts')->where('user_id',$uid)->get(), 'categories'=>DB::table('categories')->where('user_id',$uid)->get(), 'transactions'=>DB::table('transactions')->where('user_id',$uid)->orderByDesc('date')->orderByDesc('id')->get(), 'budgets'=>DB::table('budgets')->where('user_id',$uid)->get()]);
+        return Inertia::render('Dashboard', ['accounts'=>DB::table('accounts')->where('user_id',$uid)->get(), 'categories'=>DB::table('categories')->where('user_id',$uid)->orderByRaw('LOWER(name)')->orderBy('id')->get(), 'transactions'=>DB::table('transactions')->where('user_id',$uid)->orderByDesc('date')->orderByDesc('id')->get(), 'budgets'=>DB::table('budgets')->where('user_id',$uid)->get()]);
     }
     public function save(Request $r, string $resource, ?int $id = null) {
         abort_unless(in_array($resource,['transactions','accounts','categories','budgets']),404);
