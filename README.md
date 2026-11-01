@@ -58,6 +58,12 @@ For SQLite, stop application writes and copy `database/database.sqlite` to a sec
 
 ## Further phases from the feature reference
 
-This implementation is the personal-finance MVP. Recurring entries and bill reminders, receipt uploads, savings goals, debt schedules, subcategories, bank imports, password reset email, multi-currency conversion, household sharing, AI/OCR, and paid plans remain future work. It does not connect to banks or automatically move real money.
+This implementation is the personal-finance MVP. Recurring entries and bill reminders, receipt uploads, savings goals, debt schedules, subcategories, bank imports, multi-currency conversion, household sharing, AI/OCR, and paid plans remain future work. It does not connect to banks or automatically move real money.
 
 Before public deployment, configure HTTPS, production mail, `APP_DEBUG=false`, secure session cookies, and scheduled backups. Serve only the `public` directory.
+
+## Password recovery
+
+Use **Forgot password?** on the sign-in page. Reset links expire after 60 minutes and can only be used once. Requests are rate limited.
+
+Local development currently uses `MAIL_MAILER=log`; recovery emails are written to `storage/logs/laravel.log` rather than delivered. For real delivery, set `MAIL_MAILER=smtp`, `MAIL_HOST`, `MAIL_PORT`, `MAIL_USERNAME`, `MAIL_PASSWORD`, `MAIL_SCHEME`, and `MAIL_FROM_ADDRESS` in the deployment environment using your mail provider settings. Set `APP_URL` to the application URL and run `php artisan config:clear` after changing configuration. Keep credentials out of source control.

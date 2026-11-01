@@ -20,6 +20,7 @@ class User extends Authenticatable
      */
     protected $fillable = [
         'name',
+        'username',
         'email',
         'password',
     ];
@@ -30,9 +31,16 @@ class User extends Authenticatable
      * @var list<string>
      */
     protected $hidden = [
+        'profile_photo_path',
         'password',
         'remember_token',
     ];
+
+    protected $appends = ['profile_photo_url'];
+
+    public function getProfilePhotoUrlAttribute(): ?string {
+        return $this->profile_photo_path ? '/profile/photo?v='.rawurlencode($this->profile_photo_path) : null;
+    }
 
     /**
      * Get the attributes that should be cast.

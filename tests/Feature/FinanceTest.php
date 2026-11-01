@@ -9,8 +9,46 @@ class FinanceTest extends TestCase {
     protected function setUp(): void { parent::setUp(); $this->withoutVite(); $this->travelTo(\Illuminate\Support\Carbon::parse('2026-10-28 12:00:00', 'Asia/Dhaka')); }
     private function account(int $user, string $name = 'Bank'): int { return DB::table('accounts')->insertGetId(['user_id'=>$user,'name'=>$name,'type'=>'Bank','opening_balance'=>100000]); }
     public function test_guests_must_sign_in(): void { $this->get('/')->assertRedirect('/login'); $this->get('/login')->assertOk(); }
+    public function test_custom_account_types_can_be_created_and_updated(): void {
+        $u=User::factory()->create(); $this->actingAs($u);
+        $payload=['name'=>'Travel wallet','type'=>'Mobile wallet','opening_balance'=>0];
+        $this->post('/finance/accounts',$payload)->assertSessionHasNoErrors();
+        $id=DB::table('accounts')->where('user_id',$u->id)->value('id');
+        $this->assertDatabaseHas('accounts',['id'=>$id,'type'=>'Mobile wallet']);
+        $this->put('/finance/accounts/'.$id,[...$payload,'type'=>'Investment'])->assertSessionHasNoErrors();
+        $this->assertDatabaseHas('accounts',['id'=>$id,'type'=>'Investment']);
+        foreach (['', '   ', str_repeat('a',101)] as $type) {
+            $this->post('/finance/accounts',[...$payload,'type'=>$type])->assertSessionHasErrors('type');
+        }
+        $this->assertDatabaseCount('accounts',1);
+    }
+    public function test_only_owner_can_delete_an_unused_account(): void {
+        $u=User::factory()->create(); $other=User::factory()->create();
+        $a=$this->account($u->id); $b=$this->account($other->id);
+        $this->delete('/accounts/'.$a)->assertRedirect('/login');
+        $this->actingAs($u)->delete('/accounts/'.$b)->assertNotFound();
+        $this->delete('/accounts/'.$a)->assertRedirect()->assertSessionHas('success','Account deleted.');
+        $this->assertDatabaseMissing('accounts',['id'=>$a]);
+        $this->assertDatabaseHas('accounts',['id'=>$b]);
+    }
+    public function test_account_deletion_requires_removing_or_reassigning_all_related_records(): void {
+        $u=User::factory()->create(); $a=$this->account($u->id); $b=$this->account($u->id,'Wallet'); $c=$this->account($u->id,'Savings');
+        $this->actingAs($u);
+        $id=DB::table('transactions')->insertGetId(['user_id'=>$u->id,'account_id'=>$a,'destination_id'=>$b,'type'=>'transfer','title'=>'Transfer','amount'=>100,'date'=>'2026-10-28']);
+        foreach ([$a,$b] as $account) {
+            $this->delete('/accounts/'.$account)->assertRedirect()->assertSessionHasErrors('account');
+            $this->assertDatabaseHas('accounts',['id'=>$account]);
+        }
+        $this->assertDatabaseHas('transactions',['id'=>$id,'account_id'=>$a,'destination_id'=>$b]);
+        $this->put('/finance/transactions/'.$id,['title'=>'Transfer','type'=>'transfer','amount'=>1,'date'=>'2026-10-28','account_id'=>$c,'destination_id'=>$b])->assertSessionHasNoErrors();
+        $this->delete('/accounts/'.$a)->assertSessionHasNoErrors();
+        $this->assertDatabaseMissing('accounts',['id'=>$a]);
+        $this->delete('/transactions/'.$id)->assertRedirect();
+        $this->delete('/accounts/'.$b)->assertSessionHasNoErrors();
+        $this->assertDatabaseMissing('accounts',['id'=>$b]);
+    }
     public function test_registration_creates_private_workspace(): void {
-        $this->post('/register',['name'=>'Alex','email'=>'alex@example.test','password'=>'password123'])->assertRedirect('/');
+        $this->post('/register',['name'=>'Alex','username'=>'alex_123','email'=>'alex@example.test','password'=>'password123'])->assertRedirect('/');
         $this->assertAuthenticated(); $this->assertDatabaseCount('accounts',1); $this->assertDatabaseCount('categories',9);
         $this->get('/')->assertOk();
     }

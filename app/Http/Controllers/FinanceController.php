@@ -7,10 +7,21 @@ use App\Models\User;
 use Inertia\Inertia;
 class FinanceController extends Controller
 {
+    public function availability(Request $r) {
+        $r->validate(['field'=>'required|in:username,email']);
+        $field=$r->input('field');
+        $value=trim((string) $r->input('value'));
+        if ($field==='username') $value=strtolower($value);
+        $r->merge(['value'=>$value]);
+        $data=$r->validate(['value'=>$field==='username'?['required','string','min:3','max:30','regex:/^[a-z0-9_]+$/']:['required','email','max:255']]);
+        return response()->json(['available'=>!User::where($field,$data['value'])->exists()])->header('Cache-Control','no-store');
+    }
     public function auth(Request $r, string $mode = 'login') {
-        $data = $r->validate(['email'=>['required','email'], 'password'=>['required','string','min:8'], 'name'=>[$mode === 'register' ? 'required' : 'nullable','string','max:100']]);
+        $data = $r->validate(['email'=> $mode === 'register' ? ['required','email','max:255'] : ['required','string','max:255'], 'password'=>['required','string','min:8'], 'name'=>[$mode === 'register' ? 'required' : 'nullable','string','max:100']]);
         if ($mode === 'register') {
-            $r->validate(['email'=>'unique:users,email']);
+            $r->merge(['username'=>strtolower(trim((string) $r->input('username')))]);
+            $registration=$r->validate(['email'=>'unique:users,email','username'=>['required','string','min:3','max:30','regex:/^[a-z0-9_]+$/','unique:users,username']],['username.regex'=>'Use letters, numbers, and underscores only.']);
+            $data['username']=$registration['username'];
             $user = DB::transaction(function () use ($data) {
                 $user = User::create($data);
                 foreach (['Food & groceries','Housing','Transportation','Shopping','Entertainment','Healthcare','Salary','Freelance','Other'] as $name) DB::table('categories')->insert(['user_id'=>$user->id,'name'=>$name,'color'=>'#28765c']);
@@ -18,8 +29,13 @@ class FinanceController extends Controller
                 return $user;
             });
             Auth::login($user);
-        } elseif (!Auth::attempt($r->only('email','password'))) {
-            return back()->withErrors(['email'=>'The email or password is incorrect.']);
+        } else {
+            $identifier=trim($data['email']);
+            $field=str_contains($identifier,'@')?'email':'username';
+            if ($field==='username') $identifier=strtolower($identifier);
+            if (!Auth::attempt([$field=>$identifier,'password'=>$data['password']])) {
+                return back()->withErrors(['email'=>'The email, username, or password is incorrect.']);
+            }
         }
         $r->session()->regenerate();
         return redirect('/');
@@ -35,7 +51,7 @@ class FinanceController extends Controller
         $owned = fn ($table) => Rule::exists($table,'id')->where('user_id',$uid);
         $rules = match ($resource) {
             'transactions'=>['title'=>'required|string|max:150','type'=>'required|in:income,expense,transfer','amount'=>'required|numeric|min:0.01|max:999999999','date'=>['required','date_format:Y-m-d','before_or_equal:'.now('Asia/Dhaka')->toDateString()],'account_id'=>['required',$owned('accounts')],'destination_id'=>['nullable','required_if:type,transfer','different:account_id',$owned('accounts')],'category_id'=>['nullable','required_unless:type,transfer',$owned('categories')],'notes'=>'nullable|string|max:2000'],
-            'accounts'=>['name'=>'required|string|max:100','type'=>'required|in:Cash,Bank,bKash,Nagad,Credit card,Savings','opening_balance'=>'required|numeric|min:0|max:999999999'],
+            'accounts'=>['name'=>'required|string|max:100','type'=>'required|string|max:100','opening_balance'=>'required|numeric|min:0|max:999999999'],
             'categories'=>['name'=>'required|string|max:100','color'=>'required|regex:/^#[a-fA-F0-9]{6}$/'],
             'budgets'=>['category_id'=>['required',$owned('categories')],'amount'=>'required|numeric|min:0.01|max:999999999','month'=>'required|date_format:Y-m'],
         };
@@ -55,6 +71,18 @@ class FinanceController extends Controller
         $deleted=DB::table('transactions')->where(['id'=>$id,'user_id'=>$r->user()->id])->delete();
         abort_unless($deleted,404);
         return back()->with('success','Transaction deleted.');
+    }
+    public function destroyAccount(Request $r, int $id) {
+        return DB::transaction(function () use ($r, $id) {
+            $account = DB::table('accounts')->where(['id'=>$id,'user_id'=>$r->user()->id])->lockForUpdate()->first();
+            abort_unless($account,404);
+            $hasRecords = DB::table('transactions')->where(function ($query) use ($id) {
+                $query->where('account_id',$id)->orWhere('destination_id',$id);
+            })->exists();
+            if ($hasRecords) return back()->withErrors(['account'=>'This account has related transactions. Remove them or reassign them to another account first. Transferring the balance alone does not move transaction records.']);
+            DB::table('accounts')->where('id',$id)->delete();
+            return back()->with('success','Account deleted.');
+        });
     }
     public function export(Request $r) {
         return response()->streamDownload(function () use ($r) {
