@@ -349,9 +349,9 @@ body select:not([multiple]):not([size]){
 
 /* Keep keyboard-sized editors usable: only the fields scroll. */
 .modal-backdrop {overscroll-behavior:none}
-.modal {display:flex;flex-direction:column;min-height:0;overflow:hidden;scrollbar-gutter:auto;padding:0}
+.modal {display:grid;grid-template-rows:auto minmax(0,1fr);min-height:0;overflow:clip;scrollbar-gutter:auto;padding:0}
 .modal > .spread {position:static;flex-shrink:0;padding:20px 28px 14px;gap:12px}
-.modal form {display:flex;flex-direction:column;min-height:0;overflow:hidden;margin-top:0}
+.modal form {display:grid;grid-template-rows:minmax(0,1fr) auto;min-height:0;overflow:visible;margin-top:0}
 .modal-fields {min-height:0;overflow-y:auto;overscroll-behavior-y:contain;-webkit-overflow-scrolling:touch;padding:8px 28px;scroll-padding-block:12px;scrollbar-width:thin;scrollbar-color:#9aafa1 #f3f6f3}
 .modal-actions {position:static;flex-shrink:0;margin:0;padding:14px 28px;border-top:1px solid #edf0ed;background:#fff}
 .modal-actions > button {min-height:44px}
@@ -366,8 +366,24 @@ body select:not([multiple]):not([size]){
  .modal-actions {padding:10px 16px}
 }
 .modal-compact {padding:8px;align-items:flex-start}
-.modal-compact .modal {max-height:100%}
+.modal-compact .modal {height:100%;max-height:100%}
 .modal-compact .modal > .spread {padding-block:8px}
 .modal-compact .modal .eyebrow {display:none}
 .modal-compact .modal h2 {font-size:20px}
 .modal-compact .modal-actions {padding-block:8px}
+
+/* Do not let automatic focus scrolling move non-scrolling form ancestors. */
+.modal-backdrop {overflow:clip}
+.modal-fields > label,.modal-fields .form-grid > label,.modal-fields .form-field {scroll-margin-block:12px}
+.alert-dialog {inset:var(--visible-top,0px) 0 auto;margin:16px auto;max-height:calc(var(--visible-height,100dvh) - 32px);overscroll-behavior:contain}
+.auth-shell,.recovery-page {min-height:var(--visible-height,100dvh)}
+.profile-settings {overflow:clip}
+@media (max-width:1024px),(pointer:coarse) {
+ /* Later component rules must not reintroduce iOS focus zoom. */
+ input:not([type=checkbox]):not([type=radio]):not([type=file]),textarea,select,.transaction-filters .search input {font-size:16px}
+}
+.viewport-short .auth-shell {align-items:start}
+.viewport-short .auth-story {display:none}
+.viewport-short .auth-shell {grid-template-columns:minmax(0,1fr)}
+.viewport-short .auth-form {padding-block:20px}
+.viewport-short .recovery-page {align-items:start;padding-block:16px}

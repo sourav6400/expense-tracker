@@ -26,7 +26,7 @@ export default function Calculator({onClose}){
  useEffect(()=>{
   const previous=document.activeElement,overflow=document.body.style.overflow;
   document.body.style.overflow='hidden';ref.current.showModal();
-  return ()=>{document.body.style.overflow=overflow;previous?.focus();};
+  return ()=>{document.body.style.overflow=overflow;previous?.focus({preventScroll:true});};
  },[]);
  const keys=[['AC','clear','Clear'],['+/−','sign','Change sign'],['%','%','Percent'],['÷','/','Divide'],['7','7'],['8','8'],['9','9'],['×','*','Multiply'],['4','4'],['5','5'],['6','6'],['−','-','Subtract'],['1','1'],['2','2'],['3','3'],['+','+','Add'],[<Delete size={18}/>,'back','Backspace'],['0','0'],['.','.','Decimal point'],['=','=','Equals']];
  return <dialog ref={ref} className="alert-dialog calculator-dialog" aria-labelledby="calculator-title" onCancel={e=>{e.preventDefault();onClose();}} onKeyDown={e=>{

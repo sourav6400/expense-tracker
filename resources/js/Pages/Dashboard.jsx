@@ -1,3 +1,4 @@
+import {observeVisualViewport} from '../viewport';
 import PeriodFilter from '../Components/PeriodFilter';
 import Select from '../Components/Select';
 import Calculator from '../Components/Calculator';
@@ -76,35 +77,31 @@ function CashChart({transactions,month}) {
  const months=Array.from({length:6},(_,i)=>{const d=new Date(month+'-15');d.setMonth(d.getMonth()-5+i);const key=d.toISOString().slice(0,7);return {label:d.toLocaleDateString('en',{month:'short'}),income:transactions.filter(t=>t.date.startsWith(key)&&t.type==='income').reduce((s,t)=>s+t.amount,0),expense:transactions.filter(t=>t.date.startsWith(key)&&t.type==='expense').reduce((s,t)=>s+t.amount,0)}});const max=Math.max(...months.flatMap(m=>[m.income,m.expense]),10000);
  return <div className="cash-chart"><div className="axis">{[1,.75,.5,.25,0].map(n=><span key={n}>{money(max*n)}</span>)}</div><div className="plot"><div className="grid-lines">{[0,1,2,3,4].map(n=><i key={n}/>)}</div><div className="bars">{months.map(m=><div className="bar-group" key={m.label}><div className="bar-pair"><div title={'Income: '+money(m.income)} style={{height:Math.max(m.income/max*100,1)+'%'}}/><div title={'Expenses: '+money(m.expense)} style={{height:Math.max(m.expense/max*100,1)+'%'}}/></div><span>{m.label}</span></div>)}</div></div></div>
 }
-function Editor({modal,close,accounts,categories,transactions,month}) {
+export function Editor({modal,close,accounts,categories,transactions,month}) {
  const {resource,type,item}=modal; const dialogRef=useRef(null);
  useEffect(()=>{
-  const viewport=window.visualViewport;
   const backdrop=dialogRef.current.parentElement;
-  let frame;
-  const revealFocusedField=()=>{
-   const scroller=dialogRef.current?.querySelector('.modal-fields');
-   const focused=document.activeElement;
-   if(!scroller?.contains(focused))return;
-   const bounds=scroller.getBoundingClientRect(),field=focused.getBoundingClientRect();
-   if(field.bottom>bounds.bottom-12)scroller.scrollTop+=field.bottom-bounds.bottom+12;
-   else if(field.top<bounds.top+12)scroller.scrollTop+=field.top-bounds.top-12;
-  };
-  const update=()=>{
-   backdrop.style.height=(viewport?.height||window.innerHeight)+'px';
-   backdrop.style.top=(viewport?.offsetTop||0)+'px';
-   backdrop.classList.toggle('modal-compact',(viewport?.height||window.innerHeight)<500);
-   cancelAnimationFrame(frame);
-   frame=requestAnimationFrame(revealFocusedField);
-  };
   const scrollY=window.scrollY;
   const previous={overflow:document.body.style.overflow,position:document.body.style.position,top:document.body.style.top,width:document.body.style.width};
   Object.assign(document.body.style,{overflow:'hidden',position:'fixed',top:-scrollY+'px',width:'100%'});
-  backdrop.addEventListener('focusin',update);
-  update();viewport?.addEventListener('resize',update);viewport?.addEventListener('scroll',update);window.addEventListener('resize',update);
-  return()=>{cancelAnimationFrame(frame);backdrop.removeEventListener('focusin',update);viewport?.removeEventListener('resize',update);viewport?.removeEventListener('scroll',update);window.removeEventListener('resize',update);Object.assign(document.body.style,previous);window.scrollTo(0,scrollY);};
+  const stop=observeVisualViewport(({height,top})=>{
+   backdrop.style.height=height+'px';
+   backdrop.style.top=top+'px';
+   backdrop.classList.toggle('modal-compact',height<500);
+   const scroller=dialogRef.current?.querySelector('.modal-fields');
+   const focused=document.activeElement;
+   if(!scroller?.contains(focused))return;
+   // Include the label, and measure after the keyboard-sized grid has laid out.
+   const field=focused.closest('label,.form-field')||focused;
+   const bounds=scroller.getBoundingClientRect(),rect=field.getBoundingClientRect();
+   const delta=rect.height>bounds.height-24?rect.top-bounds.top-12:
+    rect.bottom>bounds.bottom-12?rect.bottom-bounds.bottom+12:
+    rect.top<bounds.top+12?rect.top-bounds.top-12:0;
+   scroller.scrollTop+=delta;
+  });
+  return()=>{stop();Object.assign(document.body.style,previous);window.scrollTo(0,scrollY)};
  },[]);
- useEffect(()=>{const previous=document.activeElement;dialogRef.current?.querySelector('button')?.focus();const handler=e=>{if(e.key==='Escape'&&!e.defaultPrevented)close();if(e.key==='Tab'){const fields=[...dialogRef.current.querySelectorAll('button,input,select')].filter(el=>!el.disabled&&el.tabIndex>=0);const first=fields[0],last=fields.at(-1);if(e.shiftKey&&document.activeElement===first){e.preventDefault();last.focus()}else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first.focus()}}};document.addEventListener('keydown',handler);return()=>{document.removeEventListener('keydown',handler);previous?.focus()}},[]);const initial=resource==='transactions'?{title:'',amount:'',type,date:new Date().toLocaleDateString('en-CA',{timeZone:'Asia/Dhaka'}),account_id:accounts[0]?.id||'',destination_id:'',category_id:categories[0]?.id||'',notes:''}:resource==='accounts'?{name:'',type:'Bank',opening_balance:0}:resource==='categories'?{name:'',color:'#28765c'}:{category_id:categories[0]?.id||'',amount:'',month};
+ useEffect(()=>{const previous=document.activeElement;dialogRef.current?.querySelector('button')?.focus({preventScroll:true});const handler=e=>{if(e.key==='Escape'&&!e.defaultPrevented)close();if(e.key==='Tab'){const fields=[...dialogRef.current.querySelectorAll('button,input,select')].filter(el=>!el.disabled&&el.tabIndex>=0);const first=fields[0],last=fields.at(-1);if(e.shiftKey&&document.activeElement===first){e.preventDefault();last.focus()}else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first.focus()}}};document.addEventListener('keydown',handler);return()=>{document.removeEventListener('keydown',handler);previous?.focus({preventScroll:true})}},[]);const initial=resource==='transactions'?{title:'',amount:'',type,date:new Date().toLocaleDateString('en-CA',{timeZone:'Asia/Dhaka'}),account_id:accounts[0]?.id||'',destination_id:'',category_id:categories[0]?.id||'',notes:''}:resource==='accounts'?{name:'',type:'Bank',opening_balance:0}:resource==='categories'?{name:'',color:'#28765c'}:{category_id:categories[0]?.id||'',amount:'',month};
  const [addingAccountType,setAddingAccountType]=useState(false);
  const accountTypes=[...new Set(['Cash','Bank','bKash','Nagad','Credit card','Savings',...accounts.map(a=>a.type)])];
  const form=useForm(item?{...initial,...item,...('amount'in item?{amount:item.amount/100}:{}),...('opening_balance'in item?{opening_balance:item.opening_balance/100}:{})}:initial);

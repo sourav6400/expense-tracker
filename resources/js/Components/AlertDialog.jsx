@@ -9,7 +9,7 @@ export default function AlertDialog({title,message,onClose,onConfirm,processing=
   const overflow=document.body.style.overflow;
   document.body.style.overflow='hidden';
   ref.current.showModal();
-  return ()=>{document.body.style.overflow=overflow;previous?.focus();};
+  return ()=>{document.body.style.overflow=overflow;previous?.focus({preventScroll:true});};
  },[]);
  const close=()=>{if(!processing)onClose();};
  return <dialog ref={ref} className="alert-dialog" aria-labelledby="alert-title" aria-describedby="alert-message" onCancel={e=>{e.preventDefault();close();}} onClick={e=>{if(e.target===e.currentTarget){const rect=ref.current.getBoundingClientRect();if(e.clientX<rect.left||e.clientX>rect.right||e.clientY<rect.top||e.clientY>rect.bottom)close();}}}>
