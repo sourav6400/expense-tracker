@@ -9,7 +9,7 @@ export default function PasswordRecovery({mode,token='',email=''}){
  const form=useForm({email,token,password:'',password_confirmation:''});
  const [visible,setVisible]=useState(false);
  return <div className="recovery-page"><section className="recovery-card">
-  <Link href="/login" className="brand"><span className="brand-icon">L</span>ledger<span className="brand-dot">.</span></Link>
+  <Link href="/" className="brand" aria-label="Ledger home"><span className="brand-icon">L</span>ledger<span className="brand-dot">.</span></Link>
   <span className="recovery-icon">{reset?<LockKeyhole size={25}/>:<Mail size={25}/>}</span>
   <h1>{reset?'Choose a new password':'Forgot your password?'}</h1>
   <p className="muted">{reset?'Set a new password to get back to your workspace.':'Enter your account email and we will send you a link to reset your password.'}</p>

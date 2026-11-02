@@ -22,6 +22,8 @@ Route::middleware('auth')->group(function () {
     Route::put('/profile/password', [ProfileController::class,'password'])->middleware('throttle:10,1');
     Route::get('/profile/photo', [ProfileController::class,'photo']);
     Route::get('/', [FinanceController::class,'index']);
+    Route::get('/finance/{resource}/create', [FinanceController::class,'editor']);
+    Route::get('/finance/{resource}/{id}/edit', [FinanceController::class,'editor'])->whereNumber('id');
     Route::post('/finance/{resource}', [FinanceController::class,'save']);
     Route::put('/finance/{resource}/{id}', [FinanceController::class,'save']);
     Route::delete('/transactions/{id}', [FinanceController::class,'destroy']);

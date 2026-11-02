@@ -40,9 +40,38 @@ class FinanceController extends Controller
         $r->session()->regenerate();
         return redirect('/');
     }
+    private function editorContext(Request $r): array {
+        $section=$r->query('section','Overview');
+        if (!in_array($section,['Overview','Transactions','Accounts','Budgets','Categories','Reports'],true)) $section='Overview';
+        $month=$r->query('month');
+        $today=now('Asia/Dhaka')->format('Y-m');
+        if (!is_string($month) || !preg_match('/^\d{4}-(0[1-9]|1[0-2])$/',$month) || $month>$today) $month=$today;
+        return ['section'=>$section,'month'=>$month];
+    }
+    private function financeData(Request $r): array {
+        $uid=$r->user()->id;
+        return ['accounts'=>DB::table('accounts')->where('user_id',$uid)->get(), 'categories'=>DB::table('categories')->where('user_id',$uid)->orderByRaw('LOWER(name)')->orderBy('id')->get(), 'transactions'=>DB::table('transactions')->where('user_id',$uid)->orderByDesc('date')->orderByDesc('id')->get(), 'budgets'=>DB::table('budgets')->where('user_id',$uid)->get()];
+    }
     public function index(Request $r) {
-        $uid = $r->user()->id;
-        return Inertia::render('Dashboard', ['accounts'=>DB::table('accounts')->where('user_id',$uid)->get(), 'categories'=>DB::table('categories')->where('user_id',$uid)->orderByRaw('LOWER(name)')->orderBy('id')->get(), 'transactions'=>DB::table('transactions')->where('user_id',$uid)->orderByDesc('date')->orderByDesc('id')->get(), 'budgets'=>DB::table('budgets')->where('user_id',$uid)->get()]);
+        $context=$this->editorContext($r);
+        return Inertia::render('Dashboard',[...$this->financeData($r),'workspaceSection'=>$context['section'],'selectedMonth'=>$context['month']]);
+    }
+    public function editor(Request $r, string $resource, ?int $id = null) {
+        abort_unless(in_array($resource,['transactions','accounts','categories','budgets'],true),404);
+        $item=null;
+        if ($id) {
+            $item=DB::table($resource)->where(['id'=>$id,'user_id'=>$r->user()->id])->first();
+            abort_unless($item,404);
+        }
+        $context=$this->editorContext($r);
+        $type=$r->query('type','expense');
+        if (!in_array($type,['expense','income','transfer'],true)) $type='expense';
+        return Inertia::render('EditorPage',[
+            ...$this->financeData($r),
+            'modal'=>['resource'=>$resource,'type'=>$item->type??$type,'item'=>$item],
+            'month'=>$context['month'],
+            'returnUrl'=>'/?'.http_build_query($context),
+        ]);
     }
     public function save(Request $r, string $resource, ?int $id = null) {
         abort_unless(in_array($resource,['transactions','accounts','categories','budgets']),404);
@@ -65,6 +94,7 @@ class FinanceController extends Controller
         if ($resource==='budgets' && !$id) DB::table($resource)->updateOrInsert(['user_id'=>$uid,'category_id'=>$data['category_id'],'month'=>$data['month']],$data);
         elseif ($id) DB::table($resource)->where(['id'=>$id,'user_id'=>$uid])->update($data);
         else DB::table($resource)->insert([...$data,'user_id'=>$uid,'created_at'=>now()]);
+        if ($r->boolean('editor_page')) return redirect('/?'.http_build_query($this->editorContext($r)))->with('success','Saved successfully.');
         return back()->with('success','Saved successfully.');
     }
     public function destroy(Request $r, int $id) {

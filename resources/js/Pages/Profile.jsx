@@ -15,7 +15,7 @@ export default function Profile(){
   return ()=>URL.revokeObjectURL(url);
  },[profile.data.photo]);
  return <div className="profile-page">
-  <header className="profile-page-header"><Link href="/" className="brand"><span className="brand-icon">L</span>ledger<span className="brand-dot">.</span></Link><Link href="/" className="secondary"><ArrowLeft size={16}/> Back to workspace</Link></header>
+  <header className="profile-page-header"><Link href="/" className="brand" aria-label="Ledger home"><span className="brand-icon">L</span>ledger<span className="brand-dot">.</span></Link><Link href="/" className="secondary"><ArrowLeft size={16}/> Back to workspace</Link></header>
   <div className="profile-page-content"><div className="eyebrow">YOUR PERSONAL SPACE</div><h1>Your profile</h1><p className="muted">Make it yours. Keep your account secure.</p>
    <Notification message={flash.success} resetKey={flash}/>
    <div className="profile-settings-grid"><section className="panel profile-settings"><div className="profile-section-title"><UserRound size={20}/><div><h2>Personal details</h2><p>Your photo and the name people know you by.</p></div></div>
